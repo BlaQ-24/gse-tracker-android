@@ -15,14 +15,21 @@ done
 [ $ok = 1 ] || { echo "::error::sdkmanager failed after retries"; tail -c 600 smoke-out/sdkmanager-$a.log | tr '\r' '\n' | tail -5; exit 1; }
 echo no | "$BIN/avdmanager" create avd -n smoke -k "$IMG" -d pixel_6 --force || { echo "::error::avdmanager failed"; exit 1; }
 export PATH="$SDK/platform-tools:$SDK/emulator:$PATH"
-nohup emulator -avd smoke -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -camera-back none -camera-front none -memory 4096 > smoke-out/emulator-process.log 2>&1 &
-adb wait-for-device
-for i in $(seq 1 120); do [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ] && break; sleep 5; done
-adb shell getprop sys.boot_completed; adb shell getprop ro.build.version.release
+nohup emulator -avd smoke -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -camera-back none -camera-front none -memory 4096 -accel on > smoke-out/emulator-process.log 2>&1 &
+EMU_PID=$!
+ls -la /dev/kvm || echo "::warning::no /dev/kvm"
+booted=0
+for i in $(seq 1 120); do
+  kill -0 $EMU_PID 2>/dev/null || { echo "::error::emulator process exited"; tail -40 smoke-out/emulator-process.log; exit 1; }
+  [ "$(timeout 10 adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ] && { booted=1; break; }
+  sleep 5
+done
+[ $booted = 1 ] || { echo "::error::emulator did not finish booting in 10 minutes"; tail -40 smoke-out/emulator-process.log; exit 1; }
+adb shell getprop ro.build.version.release
 adb shell settings put global window_animation_scale 0; adb shell settings put global transition_animation_scale 0; adb shell settings put global animator_duration_scale 0
 adb shell input keyevent 82 || true
 adb install -r -t dist/app-debug.apk || { echo "::error::adb install failed"; exit 1; }
 adb shell dumpsys package com.blaq24.gsetracker | grep -E "versionName|versionCode" | head -2
-node ci/smoke.mjs; RC=$?
+timeout 900 node ci/smoke.mjs; RC=$?
 adb emu kill || true
 exit $RC

@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: android-build
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -57,6 +61,7 @@ jobs:
   smoke-test:
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -71,6 +76,7 @@ jobs:
           sudo udevadm trigger --name-match=kvm
       - name: Run on an Android 14 emulator
         id: smoke
+        timeout-minutes: 35
         run: bash ci/emulator.sh
       - name: Summarise the smoke test
         if: always()
