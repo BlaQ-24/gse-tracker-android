@@ -13,8 +13,11 @@ ok=0; for a in 1 2 3 4; do
   rm -rf "$SDK/.temp" "$SDK/emulator" ~/.android/cache 2>/dev/null; sleep 10
 done
 [ $ok = 1 ] || { echo "::error::sdkmanager failed after retries"; tail -c 600 smoke-out/sdkmanager-$a.log | tr '\r' '\n' | tail -5; exit 1; }
+export ANDROID_USER_HOME="$HOME/.android"; export ANDROID_AVD_HOME="$HOME/.android/avd"; mkdir -p "$ANDROID_AVD_HOME"
+env | grep -E "^ANDROID" || true
 echo no | "$BIN/avdmanager" create avd -n smoke -k "$IMG" -d pixel_6 --force || { echo "::error::avdmanager failed"; exit 1; }
 export PATH="$SDK/platform-tools:$SDK/emulator:$PATH"
+find / -name "smoke.ini" -path "*avd*" 2>/dev/null | head; emulator -list-avds
 nohup emulator -avd smoke -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -camera-back none -camera-front none -memory 4096 -accel on > smoke-out/emulator-process.log 2>&1 &
 EMU_PID=$!
 ls -la /dev/kvm || echo "::warning::no /dev/kvm"
