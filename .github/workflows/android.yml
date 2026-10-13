@@ -1,0 +1,99 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+      signed: ${{ steps.sign.outputs.signed }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21, cache: gradle }
+      - run: npm ci
+      - name: Prepare web assets (tracker + Capacitor runtime)
+        run: node scripts/prepare-www.mjs
+      - id: ver
+        run: echo "version=$(grep -oP "const APP_VERSION\s*=\s*'\K[^']+" src/tracker.html)" >> "$GITHUB_OUTPUT"
+      - run: npx cap sync android
+      - name: Restore signing key
+        id: sign
+        env: { PASS: '${{ secrets.GSE_SIGNING_PASS }}' }
+        run: |
+          if [ -n "$PASS" ]; then
+            openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in signing/gse-tracker-release.jks.enc -out "$RUNNER_TEMP/gse-release.jks" -pass env:PASS
+            echo "GSE_KEYSTORE=$RUNNER_TEMP/gse-release.jks" >> "$GITHUB_ENV"; echo "signed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Secret GSE_SIGNING_PASS is not set: the release APK is unsigned and will not be published"; echo "signed=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Build APKs
+        working-directory: android
+        env:
+          GSE_KEYSTORE_PASSWORD: ${{ secrets.GSE_SIGNING_PASS }}
+          GSE_KEY_ALIAS: gsetracker
+          GSE_KEY_PASSWORD: ${{ secrets.GSE_SIGNING_PASS }}
+        run: |
+          V="${{ steps.ver.outputs.version }}"; IFS=. read -r MA MI PA <<< "$V"
+          ./gradlew assembleRelease assembleDebug --no-daemon -PversionName="$V" -PversionCode=$((MA*10000+MI*100+PA))
+      - name: Collect
+        run: |
+          mkdir -p dist
+          cp android/app/build/outputs/apk/release/app-release*.apk "dist/GSE-Tracker-${{ steps.ver.outputs.version }}.apk"
+          cp android/app/build/outputs/apk/debug/app-debug.apk dist/app-debug.apk
+          ls -la dist
+      - uses: actions/upload-artifact@v4
+        with: { name: apk, path: dist/ }
+
+  smoke-test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with: { name: apk, path: dist }
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Run on an Android 14 emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: adb install -r -t dist/app-debug.apk && node ci/smoke.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: smoke-test, path: smoke-out/ }
+
+  release:
+    needs: [build, smoke-test]
+    if: needs.build.outputs.signed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { name: apk, path: dist }
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.build.outputs.version }}-b${{ github.run_number }}
+          name: GSE Tracker ${{ needs.build.outputs.version }} (build ${{ github.run_number }})
+          body: Install GSE-Tracker-${{ needs.build.outputs.version }}.apk on your phone. Same signing key as every earlier build, so it installs over the previous version and keeps your data.
+          files: dist/GSE-Tracker-${{ needs.build.outputs.version }}.apk
+          make_latest: true

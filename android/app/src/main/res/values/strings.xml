@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">GSE Tracker</string>
+    <string name="title_activity_main">GSE Tracker</string>
+    <string name="package_name">com.blaq24.gsetracker</string>
+    <string name="custom_url_scheme">com.blaq24.gsetracker</string>
+</resources>

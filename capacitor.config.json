@@ -1,0 +1,11 @@
+{
+  "appId": "com.blaq24.gsetracker",
+  "appName": "GSE Tracker",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "CapacitorHttp": { "enabled": true }
+  }
+}
