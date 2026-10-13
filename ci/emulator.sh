@@ -31,6 +31,7 @@ done
 adb shell getprop ro.build.version.release
 adb shell settings put global window_animation_scale 0; adb shell settings put global transition_animation_scale 0; adb shell settings put global animator_duration_scale 0
 adb shell input keyevent 82 || true
+for f in 4 6; do echo "runner -> dev.kwayisi.org IPv$f: $(curl -$f -sS -m 15 -o /dev/null -w "%{http_code}" https://dev.kwayisi.org/apis/gse/live 2>&1)"; done
 adb install -r -t dist/app-debug.apk || { echo "::error::adb install failed"; exit 1; }
 adb shell dumpsys package com.blaq24.gsetracker | grep -E "versionName|versionCode" | head -2
 timeout 900 node ci/smoke.mjs; RC=$?

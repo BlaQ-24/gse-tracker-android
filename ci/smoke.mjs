@@ -22,6 +22,7 @@ try {
   await shot('01-dashboard');
   log('plugins', await page.evaluate(() => ({ Filesystem: Capacitor.isPluginAvailable('Filesystem'), Share: Capacitor.isPluginAvailable('Share'), FileOpener: Capacitor.isPluginAvailable('FileOpener'), GsePrint: Capacitor.isPluginAvailable('GsePrint'), nativeFetch: typeof window.CapacitorWebFetch === 'function' })));
   log('liveApi', await page.evaluate(async () => { try { const t0 = Date.now(); const r = await fetch(API_URL); const j = await r.json(); return { ok: true, status: r.status, n: Array.isArray(j) ? j.length : null, ms: Date.now() - t0, sample: Array.isArray(j) ? j.slice(0, 2) : j }; } catch (e) { return { ok: false, err: String(e && e.message || e) }; } }));
+  log('nativeHttpGithub', await page.evaluate(async () => { try { const r = await fetch('https://api.github.com/zen'); return { ok: r.ok, status: r.status, text: (await r.text()).slice(0, 80) }; } catch (e) { return { ok: false, err: String(e && e.message || e) }; } }));
   log('refresh', await page.evaluate(async () => { try { fetchGSEPrices(); } catch (e) { return String(e); } await new Promise(r => setTimeout(r, 12000)); return { quotes: Object.keys(allGSEData).length, status: (document.getElementById('apiMsg') || {}).textContent }; }));
   log('selfTest', await page.evaluate(() => runSelfTests().map(x => (x.ok ? 'PASS ' : 'FAIL ') + x.name + (x.ok ? '' : ' | got ' + x.got))));
   log('documentsWrite', await page.evaluate(async () => { try { const w = await _capPlugin('Filesystem').writeFile({ path: 'GSE Tracker/smoke.txt', data: btoa('hello'), directory: 'DOCUMENTS', recursive: true }); return { ok: true, uri: w.uri }; } catch (e) { return { ok: false, err: String(e && e.message || e) }; } }));
@@ -42,12 +43,14 @@ try {
   await page.evaluate(() => { showTab('dash'); openDataPanel(); }); await sleep(2500); await shot('20-data-panel');
   await page.evaluate(() => { const b = document.getElementById('gModalBody'); if (b) b.scrollTop = 99999; }); await sleep(1200); await shot('21-data-panel-bottom');
   await page.evaluate(() => closeModal());
-  // persistence: restart the app, data must still be there
-  await page.evaluate(() => { localStorage.setItem('gse-smoke-marker', 'kept'); saveToStorage(); });
+  // persistence: add a transaction, kill the app 1.5 s later (before the WebView flushes localStorage), restart
+  log('beforeKill', await page.evaluate(() => { transactions.push({ id: 999001, date: '2026-10-01', ticker: 'GCB', type: 'BUY', shares: 10, price: 39, fees: 1, notes: 'smoke', orderNumber: '', settlementDate: '' }); saveToStorage(); return transactions.length; }));
+  await sleep(1500);
   await sh(`am force-stop ${PKG}`); await sleep(2000); await sh(`am start -W -n ${PKG}/.MainActivity`);
+  await sleep(8000);   // the safety copy may reload the page once
   const wv2 = await device.webView({ pkg: PKG }, { timeout: 90000 }); page = await wv2.page();
-  await page.waitForFunction(() => typeof APP_VERSION !== 'undefined', null, { timeout: 120000 }); await sleep(3000);
-  log('afterRestart', await page.evaluate(() => ({ marker: localStorage.getItem('gse-smoke-marker'), tx: transactions.length, lastBackup: localStorage.getItem('gse-meta~lastBackup') })));
+  await page.waitForFunction(() => typeof APP_VERSION !== 'undefined' && typeof transactions !== 'undefined', null, { timeout: 120000 }); await sleep(3000);
+  log('afterRestart', await page.evaluate(() => ({ tx: transactions.length, hasSmokeTx: transactions.some(x => x.id === 999001), lastBackup: localStorage.getItem('gse-meta~lastBackup') })));
   R.ok = true;
 } catch (e) { R.ok = false; R.error = String(e && e.stack || e); console.error(e); try { await shot('99-failure'); } catch (_) {} }
 writeFileSync(`${OUT}/results.json`, JSON.stringify(R, null, 1));

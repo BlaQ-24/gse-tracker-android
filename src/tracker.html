@@ -3303,7 +3303,7 @@ function saveToStorage(){
   _dataVer++;
   try{localStorage.setItem(STORAGE_KEY,JSON.stringify({schemaVersion:SCHEMA_VERSION,appVersion:APP_VERSION,savedAt:new Date().toISOString(),
     transactions,currentPrices,apiPriceChange,nextTxId,importedKeys:[...importedKeys],cashEntries,nextCashId,cashImportedKeys:[...cashImportedKeys],contractNotes,
-    ciState,ciManualFlag,priceHistory,fundOverrides,CI_SHARES,dividends,nextDivId,cashPolicy,brokerRecon,auditLog,targets,planSettings,journal}));}
+    ciState,ciManualFlag,priceHistory,fundOverrides,CI_SHARES,dividends,nextDivId,cashPolicy,brokerRecon,auditLog,targets,planSettings,journal}));try{shadowSave();}catch(_){}}
   catch(e){console.warn('Save:',e);try{setAPIStatus('error','⚠ Could not save — browser storage is full or blocked. Export a backup now (⚙ Data & backup).');}catch(_){}}
 }
 function loadFromStorage(){
@@ -4703,6 +4703,7 @@ async function confirmRestore(){
       p.contractNotes.forEach(n=>{if(n.data)st.put({txId:n.txId,filename:n.filename,type:n.type,savedAt:n.savedAt,data:_b642ab(n.data)});});
       tr.oncomplete=res;tr.onerror=()=>rej(tr.error);});}catch(e){console.warn('Restore notes:',e);}
   }
+  try{await shadowSave(true);}catch(e){}   // the restored data becomes the app's safety copy too
   location.reload();
 }
 function cancelRestore(){_pendingRestore=null;renderDataPanel();}
@@ -4781,12 +4782,12 @@ function renderDataPanel(){
   const s=_summarise(cur);
   let h='';
   h+='<div class="dp-sec"><div class="dp-h">Backup</div>';
-  h+='<div class="dp-p">Everything this tracker stores lives in this browser only. Export a backup after each session; it captures transactions, cash, dividends, price history, fundamentals statements, projections and contract notes in one JSON file.</div>';
+  h+='<div class="dp-p">Everything this tracker stores lives '+(isNativeApp()?'inside this app on this phone':'in this browser')+' only. Export a backup after each session; it captures transactions, cash, dividends, price history, fundamentals statements, projections and contract notes in one JSON file.</div>';
   h+='<div class="dp-p" style="color:#555">Now stored: <b>'+s.transactions+'</b> transactions · <b>'+s.cash+'</b> cash entries · <b>'+s.dividends+'</b> dividends · <b>'+s.priceCloses+'</b> daily closes across '+s.priceSeries+' series · stores: '+Object.keys(cur).join(', ')+'</div>';
   const _ago=last?_daysBetween(last.slice(0,10),_todayStr()):null;
   h+='<div class="dp-p">Last backup: <b'+(_ago==null||_ago>7?' style="color:#A32D2D"':'')+'>'+(last?new Date(last).toLocaleString('en-GB')+' ('+(_ago===0?'today':_ago+' day'+(_ago!==1?'s':'')+' ago')+')':'never')+'</b></div>';
-  {const u=storageUse(),cap=5e6,f=u/cap;h+='<div class="dp-p" style="margin-bottom:2px">Browser storage used: <b>'+(u/1e6).toFixed(2)+' million characters</b> of about 5 million'+(f>=0.7?' — <b style="color:#A32D2D">nearly full: export a backup, then trim old price history</b>':'')+'</div><div class="stor"><div style="width:'+Math.min(100,f*100).toFixed(1)+'%;background:'+(f>=0.7?'#A32D2D':f>=0.5?'#BA7517':'#3B6D11')+'"></div></div><div class="dp-p" style="color:#888;font-size:11px">Chrome, Edge and Firefox allow about 5 million characters per site; Safari about half that.</div>';}
-  h+='<button class="btn primary" onclick="exportBackup()">⬇ Export backup</button>'+(isNativeApp()?'<div class="dp-p" style="margin-top:6px;color:#555">In the app, backups are saved to <b>Documents/GSE Tracker</b> on this phone and the share sheet opens so you can also keep a copy in Google Drive or send it to yourself. Keep one copy off the phone: uninstalling the app deletes its data.'+(lastSavedPath?' Last saved: '+esc(lastSavedPath)+'.':'')+'</div>':'')+'</div>';
+  {const u=storageUse(),cap=5e6,f=u/cap;h+='<div class="dp-p" style="margin-bottom:2px">'+(isNativeApp()?'App storage used':'Browser storage used')+': <b>'+(u/1e6).toFixed(2)+' million characters</b> of about 5 million'+(f>=0.7?' — <b style="color:#A32D2D">nearly full: export a backup, then trim old price history</b>':'')+'</div><div class="stor"><div style="width:'+Math.min(100,f*100).toFixed(1)+'%;background:'+(f>=0.7?'#A32D2D':f>=0.5?'#BA7517':'#3B6D11')+'"></div></div><div class="dp-p" style="color:#888;font-size:11px">Chrome, Edge and Firefox allow about 5 million characters per site; Safari about half that.</div>';}
+  h+='<button class="btn primary" onclick="exportBackup()">⬇ Export backup</button>'+(isNativeApp()?'<div class="dp-p" style="margin-top:6px;color:#555">In the app, backups are saved to <b>Documents/GSE Tracker</b> on this phone and the share sheet opens so you can also keep a copy in Google Drive or send it to yourself. Keep one copy off the phone: uninstalling the app deletes its data.'+(lastSavedPath?' Last file saved: '+esc(lastSavedPath)+'.':'')+'</div>':'')+'</div>';
   h+='<div class="dp-sec"><div class="dp-h">Restore</div>';
   if(_pendingRestore&&_pendingRestore.error){
     h+='<div class="dp-warn">⚠ '+esc(_pendingRestore.error)+'</div>';
@@ -6471,8 +6472,31 @@ async function openFileNative(filename,blob,mime){
 // the app's file picker filters by type; spreadsheets and backups arriving from Drive or WhatsApp are often mislabelled, so allow any file
 if(isNativeApp())document.addEventListener('click',e=>{const t=e.target;if(t&&t.tagName==='INPUT'&&t.type==='file'&&t.hasAttribute('accept'))t.removeAttribute('accept');},true);
 
+let _shadowT=null;
+function shadowSave(now){
+  if(!isNativeApp())return Promise.resolve();
+  clearTimeout(_shadowT);
+  const go=()=>{try{const ls={};_backupKeys().forEach(k=>ls[k]=localStorage.getItem(k));
+    return _capPlugin('Filesystem').writeFile({path:'gse-shadow.json',data:JSON.stringify({at:new Date().toISOString(),ls}),directory:'DATA',encoding:'utf8'}).catch(e=>console.warn('shadow',e));}catch(e){return Promise.resolve();}};
+  if(now)return go();
+  _shadowT=setTimeout(go,300);return Promise.resolve();
+}
+async function restoreShadowIfNewer(){
+  try{
+    const r=await _capPlugin('Filesystem').readFile({path:'gse-shadow.json',directory:'DATA',encoding:'utf8'});
+    const sh=JSON.parse(r.data||'{}');if(!sh.ls||!sh.ls[STORAGE_KEY])return;
+    const at=s=>{try{return JSON.parse(s||'{}').savedAt||'';}catch(e){return'';}};
+    if(at(sh.ls[STORAGE_KEY])>at(localStorage.getItem(STORAGE_KEY))){
+      Object.entries(sh.ls).forEach(([k,v])=>{if(/^gse/i.test(k)&&v!=null)localStorage.setItem(k,v);});
+      console.warn('Restored the latest edits from the app’s safety copy');location.reload();
+    }
+  }catch(e){}   // no safety copy yet
+}
+if(isNativeApp())document.addEventListener('visibilitychange',()=>{if(document.hidden)shadowSave(true);});
+
 function init(){
   installAuditHooks();
+  if(isNativeApp()&&!sessionStorage.getItem('gse-shadow-checked')){sessionStorage.setItem('gse-shadow-checked','1');restoreShadowIfNewer();}
   const loaded=loadFromStorage();
   try{_ciSanitize();}catch(e){console.warn('ci clean',e);}
   try{if(applyPriceCorrections())saveToStorage();}catch(e){console.warn('corrections',e);}
