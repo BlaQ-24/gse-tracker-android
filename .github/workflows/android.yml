@@ -70,18 +70,24 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       - name: Run on an Android 14 emulator
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 34
-          target: google_apis
-          arch: x86_64
-          profile: pixel_6
-          disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          script: adb install -r -t dist/app-debug.apk && node ci/smoke.mjs
+        id: smoke
+        run: bash ci/emulator.sh
+      - name: Summarise the smoke test
+        if: always()
+        run: |
+          if [ -f smoke-out/results.json ]; then node -e 'const r=require("./smoke-out/results.json");const s=JSON.stringify(r);console.log("::notice title=smoke::"+s.slice(0,3500).replace(/%/g,"%25").replace(/\r/g,"").replace(/\n/g," "))'; fi
+          tail -c 3000 smoke-out/emulator.log | tr '\n' ' ' | sed 's/^/::warning title=emulator-log-tail::/' ; echo
       - uses: actions/upload-artifact@v4
         if: always()
         with: { name: smoke-test, path: smoke-out/ }
+      - name: Publish test output to the ci-results branch
+        if: always()
+        run: |
+          git config user.name "ci"; git config user.email "ci@users.noreply.github.com"
+          D=$(mktemp -d); cp -r smoke-out/. "$D"/ 2>/dev/null || true
+          git checkout --orphan ci-results-tmp; git rm -rqf . ; rm -rf ./* ./.github ./.gitignore 2>/dev/null || true
+          mkdir -p "run-${{ github.run_number }}"; cp -r "$D"/. "run-${{ github.run_number }}"/ ; git add -A
+          git commit -qm "smoke test output, run ${{ github.run_number }}" && git push -f origin HEAD:ci-results
 
   release:
     needs: [build, smoke-test]
