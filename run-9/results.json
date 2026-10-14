@@ -1,0 +1,120 @@
+{
+ "steps": [
+  "01-dashboard",
+  "02-backup-share-sheet",
+  "03-excel-share-sheet",
+  "04-print-dialog",
+  "10-tab-port",
+  "10-tab-tx",
+  "10-tab-hpr",
+  "10-tab-risk",
+  "10-tab-dividends",
+  "10-tab-watchlist",
+  "10-tab-plan",
+  "10-tab-fund",
+  "20-data-panel",
+  "21-data-panel-bottom"
+ ],
+ "console": [
+  "Failed to load resource: the server responded with a status of 404 (Not Found)",
+  "Failed to load resource: net::ERR_CONNECTION_REFUSED",
+  "{message: Share canceled}",
+  "{message: Share canceled}"
+ ],
+ "boot": {
+  "version": "11.1.0",
+  "native": true,
+  "platform": "android",
+  "ua": "Mozilla/5.0 (Linux; Android 14; sdk_gphone64_x86_64 Build/UE1A.230829.050; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/113.0.5672.136 Mobile Safari/537.36",
+  "w": 412,
+  "h": 842,
+  "tx": 6
+ },
+ "plugins": {
+  "Filesystem": true,
+  "Share": true,
+  "FileOpener": true,
+  "GsePrint": true,
+  "nativeFetch": true
+ },
+ "liveApi": {
+  "ok": false,
+  "err": "Failed to fetch"
+ },
+ "nativeHttpGithub": {
+  "ok": true,
+  "status": 200,
+  "text": "Keep it logically awesome."
+ },
+ "refresh": {
+  "quotes": 0,
+  "status": "Cannot reach the GSE live feed (The user aborted a request.). Prices unchanged."
+ },
+ "selfTest": [
+  "PASS Buy and hold: 100 @ 10, close 10 → 11",
+  "PASS Add 100 @ 12 after a rise; closes 10, 12, 13 — new money is not return",
+  "PASS Charges are part of cost: 100 @ 10 + GHS 10 charges, close 10",
+  "PASS Partial sale: 50 of 100 @ 12, bought @ 10",
+  "PASS Full sale @ 12: position closes, return kept",
+  "PASS Dividend: GHS 92 net on a GHS 1,000 holding, price flat",
+  "PASS Rights 50 @ 5 paid when the close is 8 (no entitlement date)",
+  "PASS Rights 100 @ 4 valued from the ex-rights date; share falls 10 → 7 (the theoretical ex-rights price)",
+  "PASS 1-for-1 bonus; price halves 10 → 5",
+  "PASS 2-for-1 split; price halves 10 → 5",
+  "PASS XIRR: −1,000 then +1,100 a year later",
+  "PASS Personal XIRR counts cash once: deposit 2,000, buy 1,000, shares now worth 1,100",
+  "PASS Beta: portfolio moves exactly twice the index",
+  "PASS Attribution reconciles: 60 held @ 11 (+60), 40 sold @ 12 (+80), dividends 50",
+  "PASS v11 · Sell 1,500 when 1,000 are held is refused",
+  "PASS v11 · An oversell already in the ledger is flagged, not hidden",
+  "PASS v11 · A BUY matching an existing SELL on every other field is held for your decision, not skipped",
+  "PASS v11 · Three identical fills under one order import as three; re-import finds three duplicates",
+  "PASS v11 · \"TRANSFER OUT\" waits to be mapped instead of importing as a BUY",
+  "PASS v11 · Import preview accounts for every file row (bad date, no ticker, zero quantity, one good)",
+  "PASS v11 · A ticker carrying script is refused, and apostrophes are escaped",
+  "PASS v11 · Live-feed rows with bad prices or names are dropped and counted",
+  "PASS v11 · No typed price: Portfolio tab and dashboard use the same last close",
+  "PASS v11 · Typing 0 removes the typed price; the last close is used",
+  "PASS v11 · An older typed price gives way to a newer close and is flagged",
+  "PASS v11 · A typed price today is marked as an estimate in performance",
+  "PASS v11 · Impossible calendar dates are rejected",
+  "PASS v11 · A GSE close dated tomorrow is not imported",
+  "PASS v11 · A purchase dated today has held 0 days, whatever the hour",
+  "PASS v11 · Quarterly dividend paid 30 Nov is next expected at the end of February",
+  "PASS v11 · A stored type this version does not know is left out, never treated as a purchase",
+  "PASS v11 · Restore refuses a backup with a non-numeric record ID; a clean one passes",
+  "PASS v11.1 · A new finding opens; marking it Reviewed keeps it counted until fixed",
+  "PASS v11.1 · When the rule stops finding it, the issue resolves with evidence",
+  "PASS v11.1 · A resolved problem that returns reopens and is counted again",
+  "PASS v11.1 · A rise in severity sends a reviewed issue back to Open",
+  "PASS v11.1 · Accepted leaves the unresolved count, then reopens on its review date",
+  "PASS v11.1 · Issue IDs follow the rule and ticker, not the figures in the wording"
+ ],
+ "documentsWrite": {
+  "ok": true,
+  "uri": "file:///storage/emulated/0/Documents/GSE%20Tracker/smoke.txt"
+ },
+ "backupFiles": "total 44\n-rw-rw---- 1 u0_a170 media_rw 32311 2026-10-14 16:37 GSE_Portfolio_Backup_2026-10-14.json\n-rw-rw---- 1 u0_a170 media_rw     5 2026-10-14 16:37 smoke.txt",
+ "lastBackup": {
+  "last": null,
+  "saved": "Documents/GSE Tracker/GSE_Portfolio_Backup_2026-10-14.json"
+ },
+ "excelFiles": "total 92\n-rw-rw---- 1 u0_a170 media_rw 32311 2026-10-14 16:37 GSE_Portfolio_Backup_2026-10-14.json\n-rw-rw---- 1 u0_a170 media_rw 44638 2026-10-14 16:37 GSE_Portfolio_Report_2026-10-14.xlsx\n-rw-rw---- 1 u0_a170 media_rw     5 2026-10-14 16:37 smoke.txt",
+ "printingDuring": true,
+ "printingAfter": false,
+ "overflow_port": 0,
+ "overflow_tx": 0,
+ "overflow_hpr": 0,
+ "overflow_risk": 0,
+ "overflow_dividends": 0,
+ "overflow_watchlist": 0,
+ "overflow_plan": 0,
+ "overflow_fund": 0,
+ "beforeKill": 7,
+ "afterRestart": {
+  "tx": 7,
+  "hasSmokeTx": true,
+  "lastBackup": "2026-10-14T16:37:37.808Z"
+ },
+ "ok": true
+}
